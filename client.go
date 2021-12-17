@@ -14,11 +14,13 @@ type Client struct {
 	ReadBufSize  int
 	WriteBufSize int
 
-	Reconnected chan struct{}
+	Reconnected    chan struct{}
+	RequestHeaders http.Header
+	Jar            http.CookieJar
 }
 
-func NewClient(address string, headers http.Header) (*Client, error) {
-	client := &Client{}
+func NewClient(address string, headers http.Header, jar http.CookieJar) (*Client, error) {
+	client := &Client{RequestHeaders: headers, Jar: jar}
 
 	client.Address = address
 
@@ -34,7 +36,7 @@ func NewClient(address string, headers http.Header) (*Client, error) {
 		a2 := strings.Replace(address, "https", "wss", 1)
 		a2 = strings.Replace(a2, "http", "ws", 1)
 
-		ws, err := NewWebSocket(a2, headers)
+		ws, err := NewWebSocket(a2, headers, jar)
 		if err != nil {
 			return nil, err
 		}
@@ -53,7 +55,12 @@ func NewClient(address string, headers http.Header) (*Client, error) {
 }
 
 func (c *Client) Info() (*Info, error) {
-	resp, err := http.Get(c.Address + "/info")
+	client := http.Client{Jar: c.Jar}
+	req, err := http.NewRequest(http.MethodGet, c.Address+"/info", nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

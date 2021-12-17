@@ -22,9 +22,10 @@ type WebSocket struct {
 	Inbound          chan []byte
 	Reconnected      chan struct{}
 	RequestHeaders   http.Header
+	Jar              http.CookieJar
 }
 
-func NewWebSocket(address string, headers http.Header) (*WebSocket, error) {
+func NewWebSocket(address string, headers http.Header, jar http.CookieJar) (*WebSocket, error) {
 	ws := &WebSocket{
 		Address:        address,
 		ServerID:       paddedRandomIntn(999),
@@ -32,6 +33,7 @@ func NewWebSocket(address string, headers http.Header) (*WebSocket, error) {
 		Inbound:        make(chan []byte),
 		Reconnected:    make(chan struct{}, 32),
 		RequestHeaders: http.Header{},
+		Jar:            jar,
 	}
 
 	ws.TransportAddress = address + "/" + ws.ServerID + "/" + ws.SessionID + "/websocket"
@@ -42,11 +44,14 @@ func NewWebSocket(address string, headers http.Header) (*WebSocket, error) {
 }
 
 func (w *WebSocket) Loop() {
+	dialer := *websocket.DefaultDialer
+	dialer.Jar = w.Jar
+
 	go func() {
 		err := backoff.Retry(func() error {
 			log.Printf("Starting a WebSocket connection to %s", w.TransportAddress)
 
-			ws, _, err := websocket.DefaultDialer.Dial(w.TransportAddress, http.Header{})
+			ws, _, err := dialer.Dial(w.TransportAddress, http.Header{})
 			if err != nil {
 				return err
 			}
