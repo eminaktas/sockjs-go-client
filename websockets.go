@@ -32,7 +32,7 @@ func NewWebSocket(address string, headers http.Header, jar http.CookieJar) (*Web
 		SessionID:      uniuri.New(),
 		Inbound:        make(chan []byte),
 		Reconnected:    make(chan struct{}, 32),
-		RequestHeaders: http.Header{},
+		RequestHeaders: headers,
 		Jar:            jar,
 	}
 
