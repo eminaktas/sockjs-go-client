@@ -3,12 +3,13 @@ package sockjsclient
 import (
 	"encoding/json"
 	"errors"
-	"github.com/cenkalti/backoff"
-	"github.com/dchest/uniuri"
-	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 	"sync"
+
+	"github.com/cenkalti/backoff"
+	"github.com/dchest/uniuri"
+	"github.com/gorilla/websocket"
 )
 
 type WebSocket struct {
@@ -20,15 +21,17 @@ type WebSocket struct {
 	Connection       *websocket.Conn
 	Inbound          chan []byte
 	Reconnected      chan struct{}
+	RequestHeaders   http.Header
 }
 
-func NewWebSocket(address string) (*WebSocket, error) {
+func NewWebSocket(address string, headers http.Header) (*WebSocket, error) {
 	ws := &WebSocket{
-		Address:     address,
-		ServerID:    paddedRandomIntn(999),
-		SessionID:   uniuri.New(),
-		Inbound:     make(chan []byte),
-		Reconnected: make(chan struct{}, 32),
+		Address:        address,
+		ServerID:       paddedRandomIntn(999),
+		SessionID:      uniuri.New(),
+		Inbound:        make(chan []byte),
+		Reconnected:    make(chan struct{}, 32),
+		RequestHeaders: http.Header{},
 	}
 
 	ws.TransportAddress = address + "/" + ws.ServerID + "/" + ws.SessionID + "/websocket"

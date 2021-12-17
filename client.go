@@ -17,7 +17,7 @@ type Client struct {
 	Reconnected chan struct{}
 }
 
-func NewClient(address string) (*Client, error) {
+func NewClient(address string, headers http.Header) (*Client, error) {
 	client := &Client{}
 
 	client.Address = address
@@ -34,7 +34,7 @@ func NewClient(address string) (*Client, error) {
 		a2 := strings.Replace(address, "https", "wss", 1)
 		a2 = strings.Replace(a2, "http", "ws", 1)
 
-		ws, err := NewWebSocket(a2)
+		ws, err := NewWebSocket(a2, headers)
 		if err != nil {
 			return nil, err
 		}
