@@ -51,7 +51,7 @@ func (w *WebSocket) Loop() {
 		err := backoff.Retry(func() error {
 			log.Printf("Starting a WebSocket connection to %s", w.TransportAddress)
 
-			ws, _, err := dialer.Dial(w.TransportAddress, http.Header{})
+			ws, _, err := dialer.Dial(w.TransportAddress, w.RequestHeaders)
 			if err != nil {
 				return err
 			}
