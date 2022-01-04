@@ -9,7 +9,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/dchest/uniuri"
-	"github.com/gorilla/websocket"
+	"github.com/dhx71/websocket"
 )
 
 type WebSocket struct {
