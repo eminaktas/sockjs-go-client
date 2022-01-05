@@ -10,9 +10,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dchest/uniuri"
-	"github.com/igm/sockjs-go/sockjs"
 	"sync"
+
+	"github.com/dchest/uniuri"
+	"github.com/dhx71/sockjs-go/sockjs"
 )
 
 type XHR struct {
@@ -23,18 +24,18 @@ type XHR struct {
 	Inbound          chan []byte
 	Done             chan bool
 	sessionState     sockjs.SessionState
-	mu sync.RWMutex
+	mu               sync.RWMutex
 }
 
 var client = http.Client{Timeout: time.Second * 10}
 
 func NewXHR(address string) (*XHR, error) {
 	xhr := &XHR{
-		Address:   address,
-		ServerID:  paddedRandomIntn(999),
-		SessionID: uniuri.New(),
-		Inbound:   make(chan []byte),
-		Done:      make(chan bool, 1),
+		Address:      address,
+		ServerID:     paddedRandomIntn(999),
+		SessionID:    uniuri.New(),
+		Inbound:      make(chan []byte),
+		Done:         make(chan bool, 1),
 		sessionState: sockjs.SessionOpening,
 	}
 	xhr.TransportAddress = address + "/" + xhr.ServerID + "/" + xhr.SessionID
