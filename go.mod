@@ -1,6 +1,6 @@
-module github.com/dhx71/sockjs-go-client
+module github.com/eminaktas/sockjs-go-client
 
-go 1.17
+go 1.21
 
 require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
