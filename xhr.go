@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -13,7 +13,7 @@ import (
 	"sync"
 
 	"github.com/dchest/uniuri"
-	"github.com/dhx71/sockjs-go/sockjs"
+	"github.com/igm/sockjs-go/v3/sockjs"
 )
 
 type XHR struct {
@@ -59,25 +59,27 @@ func (x *XHR) Init() error {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 
 	if body[0] != 'o' {
-		return errors.New("Invalid initial message")
+		return errors.New("invalid initial message")
 	}
 	x.setSessionState(sockjs.SessionActive)
 
 	return nil
 }
 
-func (x *XHR) doneNotify() {
-	return
-}
+// func (x *XHR) doneNotify() {
+// 	return
+// }
 
 func (x *XHR) StartReading() {
 	client := &http.Client{Timeout: time.Second * 30}
+
+forLoop:
 	for {
 		select {
 		case <-x.Done:
@@ -94,7 +96,7 @@ func (x *XHR) StartReading() {
 				continue
 			}
 
-			data, err := ioutil.ReadAll(resp.Body)
+			data, err := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 			if err != nil {
 				log.Print(err)
@@ -113,50 +115,45 @@ func (x *XHR) StartReading() {
 				x.setSessionState(sockjs.SessionClosed)
 				var v []interface{}
 				if err := json.Unmarshal(data[1:], &v); err != nil {
-					log.Printf("Closing session: %s", err)
-					break
+					log.Printf("closing session: %s", err)
+					break forLoop
 				}
 				log.Printf("%v: %v", v[0], v[1])
-				break
+				break forLoop
 			}
 		}
 	}
 }
 
-func (x *XHR) ReadJSON(v interface{}) error {
-	message := <-x.Inbound
-	return json.Unmarshal(message, v)
+func (x *XHR) Read(v []byte) (int, error) {
+	n := copy(v, <-x.Inbound)
+	return n, nil
 }
 
-func (x *XHR) WriteJSON(v interface{}) error {
-	message, err := json.Marshal(v)
+func (x *XHR) Write(v []byte) (int, error) {
+	req, err := http.NewRequest("POST", x.TransportAddress+"/xhr_send", bytes.NewReader(v))
 	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("POST", x.TransportAddress+"/xhr_send", bytes.NewReader(message))
-	if err != nil {
-		return err
+		return len(v), err
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return len(v), err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 204 {
-		return errors.New("Invalid HTTP code - " + resp.Status)
+		return len(v), errors.New("invalid HTTP code - " + resp.Status)
 	}
 
-	return nil
+	return len(v), nil
 }
 
 func (x *XHR) Close() error {
 	select {
 	case x.Done <- true:
 	default:
-		return fmt.Errorf("Error closing XHR")
+		return fmt.Errorf("error closing XHR")
 	}
 	return nil
 }

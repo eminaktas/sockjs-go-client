@@ -1,7 +1,7 @@
 package sockjsclient
 
 type Connection interface {
-	ReadJSON(interface{}) error
-	WriteJSON(interface{}) error
+	Read([]byte) (int, error)
+	Write([]byte) (int, error)
 	Close() error
 }

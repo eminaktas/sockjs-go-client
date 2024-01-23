@@ -9,7 +9,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 	"github.com/dchest/uniuri"
-	"github.com/dhx71/websocket"
+	"github.com/gorilla/websocket"
 )
 
 type WebSocket struct {
@@ -20,6 +20,7 @@ type WebSocket struct {
 	SessionID        string
 	Connection       *websocket.Conn
 	Inbound          chan []byte
+	MessageType      chan int
 	Reconnected      chan struct{}
 	RequestHeaders   http.Header
 	Jar              http.CookieJar
@@ -63,15 +64,16 @@ func (w *WebSocket) Loop() {
 			}
 
 			if data[0] != 'o' {
-				return errors.New("Invalid initial message")
+				return errors.New("invalid initial message")
 			}
 
 			w.Connection = ws
 
 			w.Reconnected <- struct{}{}
 
+		forLoop:
 			for {
-				_, data, err := w.Connection.ReadMessage()
+				messageType, data, err := w.Connection.ReadMessage()
 				if err != nil {
 					return err
 				}
@@ -83,9 +85,11 @@ func (w *WebSocket) Loop() {
 				switch data[0] {
 				case 'h':
 					// Heartbeat
+					log.Printf("Heartbeat to %s", w.TransportAddress)
 					continue
 				case 'a':
 					// Normal message
+					w.MessageType <- messageType
 					w.Inbound <- data[1:]
 				case 'c':
 					// Session closed
@@ -94,11 +98,11 @@ func (w *WebSocket) Loop() {
 						log.Printf("Closing session: %s", err)
 						return nil
 					}
-					break
+					break forLoop
 				}
 			}
 
-			return errors.New("Connection closed")
+			return errors.New("connection closed")
 		}, backoff.NewExponentialBackOff())
 		if err != nil {
 			log.Print(err)
@@ -108,13 +112,14 @@ func (w *WebSocket) Loop() {
 	<-w.Reconnected
 }
 
-func (w *WebSocket) ReadJSON(v interface{}) error {
-	message := <-w.Inbound
-	return json.Unmarshal(message, v)
+func (w *WebSocket) Read(v []byte) (int, error) {
+	n := copy(v, <-w.Inbound)
+	return n, nil
 }
 
-func (w *WebSocket) WriteJSON(v interface{}) error {
-	return w.Connection.WriteJSON(v)
+func (w *WebSocket) Write(v []byte) (int, error) {
+	messageType := <-w.MessageType
+	return len(v), w.Connection.WriteMessage(messageType, v)
 }
 
 func (w *WebSocket) Close() error {
