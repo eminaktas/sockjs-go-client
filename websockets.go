@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/cenkalti/backoff"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/dchest/uniuri"
 	"github.com/gorilla/websocket"
 )
@@ -20,7 +20,6 @@ type WebSocket struct {
 	SessionID        string
 	Connection       *websocket.Conn
 	Inbound          chan []byte
-	MessageType      chan int
 	Reconnected      chan struct{}
 	RequestHeaders   http.Header
 	Jar              http.CookieJar
@@ -71,9 +70,8 @@ func (w *WebSocket) Loop() {
 
 			w.Reconnected <- struct{}{}
 
-		forLoop:
 			for {
-				messageType, data, err := w.Connection.ReadMessage()
+				_, data, err := w.Connection.ReadMessage()
 				if err != nil {
 					return err
 				}
@@ -85,11 +83,9 @@ func (w *WebSocket) Loop() {
 				switch data[0] {
 				case 'h':
 					// Heartbeat
-					log.Printf("Heartbeat to %s", w.TransportAddress)
 					continue
 				case 'a':
 					// Normal message
-					w.MessageType <- messageType
 					w.Inbound <- data[1:]
 				case 'c':
 					// Session closed
@@ -98,11 +94,9 @@ func (w *WebSocket) Loop() {
 						log.Printf("Closing session: %s", err)
 						return nil
 					}
-					break forLoop
+					return errors.New("connection closed")
 				}
 			}
-
-			return errors.New("connection closed")
 		}, backoff.NewExponentialBackOff())
 		if err != nil {
 			log.Print(err)
@@ -113,13 +107,13 @@ func (w *WebSocket) Loop() {
 }
 
 func (w *WebSocket) Read(v []byte) (int, error) {
-	n := copy(v, <-w.Inbound)
+	data := <-w.Inbound
+	n := copy(v, data)
 	return n, nil
 }
 
 func (w *WebSocket) Write(v []byte) (int, error) {
-	messageType := <-w.MessageType
-	return len(v), w.Connection.WriteMessage(messageType, v)
+	return len(v), w.Connection.WriteMessage(1, v)
 }
 
 func (w *WebSocket) Close() error {

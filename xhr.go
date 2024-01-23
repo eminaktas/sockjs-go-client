@@ -79,7 +79,6 @@ func (x *XHR) Init() error {
 func (x *XHR) StartReading() {
 	client := &http.Client{Timeout: time.Second * 30}
 
-forLoop:
 	for {
 		select {
 		case <-x.Done:
@@ -116,17 +115,18 @@ forLoop:
 				var v []interface{}
 				if err := json.Unmarshal(data[1:], &v); err != nil {
 					log.Printf("closing session: %s", err)
-					break forLoop
+					return
 				}
 				log.Printf("%v: %v", v[0], v[1])
-				break forLoop
+				return
 			}
 		}
 	}
 }
 
 func (x *XHR) Read(v []byte) (int, error) {
-	n := copy(v, <-x.Inbound)
+	data := <-x.Inbound
+	n := copy(v, data)
 	return n, nil
 }
 
