@@ -92,9 +92,9 @@ func (w *WebSocket) Loop() {
 					var v []interface{}
 					if err := json.Unmarshal(data[1:], &v); err != nil {
 						log.Printf("Closing session: %s", err)
-						return nil
 					}
-					return errors.New("connection closed")
+					close(w.Inbound)
+					return backoff.Permanent(errors.New("connection closed"))
 				}
 			}
 		}, backoff.NewExponentialBackOff())
