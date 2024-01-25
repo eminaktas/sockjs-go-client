@@ -1,19 +1,20 @@
 package sockjsclient
 
 import (
-	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
-	"sync"
+	"strconv"
+	"strings"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/dchest/uniuri"
 	"github.com/gorilla/websocket"
 )
 
+// WebSocket represents a SockJS WebSocket connection.
 type WebSocket struct {
-	sync.Mutex
 	Address          string
 	TransportAddress string
 	ServerID         string
@@ -25,6 +26,7 @@ type WebSocket struct {
 	Jar              http.CookieJar
 }
 
+// NewWebSocket creates a new WebSocket instance.
 func NewWebSocket(address string, headers http.Header, jar http.CookieJar) (*WebSocket, error) {
 	ws := &WebSocket{
 		Address:        address,
@@ -49,8 +51,6 @@ func (w *WebSocket) Loop() {
 
 	go func() {
 		err := backoff.Retry(func() error {
-			log.Printf("Starting a WebSocket connection to %s", w.TransportAddress)
-
 			ws, _, err := dialer.Dial(w.TransportAddress, w.RequestHeaders)
 			if err != nil {
 				return err
@@ -63,7 +63,7 @@ func (w *WebSocket) Loop() {
 			}
 
 			if data[0] != 'o' {
-				return errors.New("invalid initial message")
+				return backoff.Permanent(errors.New("invalid initial message"))
 			}
 
 			w.Connection = ws
@@ -75,7 +75,6 @@ func (w *WebSocket) Loop() {
 				if err != nil {
 					return err
 				}
-
 				if len(data) < 1 {
 					continue
 				}
@@ -89,10 +88,6 @@ func (w *WebSocket) Loop() {
 					w.Inbound <- data[1:]
 				case 'c':
 					// Session closed
-					var v []interface{}
-					if err := json.Unmarshal(data[1:], &v); err != nil {
-						log.Printf("Closing session: %s", err)
-					}
 					close(w.Inbound)
 					return backoff.Permanent(errors.New("connection closed"))
 				}
@@ -106,16 +101,48 @@ func (w *WebSocket) Loop() {
 	<-w.Reconnected
 }
 
+// Read reads a message from the WebSocket and unquotes it.
 func (w *WebSocket) Read(v []byte) (int, error) {
-	data := <-w.Inbound
-	n := copy(v, data)
+	// Wait for an inbound message from the channel.
+	message := <-w.Inbound
+
+	// Convert the received message to a string for processing.
+	messageString := string(message)
+
+	// Trim the brackets "[" and "]" from the string.
+	messageString = strings.TrimPrefix(messageString, "[")
+	messageString = strings.TrimSuffix(messageString, "]")
+
+	// Unquote the string to handle escaped characters.
+	unquoted, err := strconv.Unquote(messageString)
+	if err != nil {
+		return 0, err
+	}
+
+	// Copy the unquoted message to the provided byte slice.
+	n := copy(v, []byte(unquoted))
+
+	// Return the number of bytes copied and a nil error.
 	return n, nil
 }
 
+// Write writes a message to the WebSocket after formatting and escaping it.
 func (w *WebSocket) Write(v []byte) (int, error) {
-	return len(v), w.Connection.WriteMessage(1, v)
+	// Format the byte slice as a Go-syntax quoted string.
+	quotedMessage := fmt.Sprintf("[%q]", v)
+
+	// Replace occurrences of null character (\x00) with Unicode escape sequence (\u0000).
+	// This is done to ensure compatibility with systems that may not recognize \x00.
+	escapedMessage := strings.ReplaceAll(quotedMessage, `\x00`, `\u0000`)
+
+	// Convert the escaped message back to a byte slice for transmission.
+	message := []byte(escapedMessage)
+
+	// Write the message to the WebSocket connection.
+	return len(message), w.Connection.WriteMessage(websocket.TextMessage, message)
 }
 
+// Close closes the WebSocket connection.
 func (w *WebSocket) Close() error {
 	return w.Connection.Close()
 }

@@ -2,11 +2,8 @@ package sockjsclient
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
@@ -77,8 +74,6 @@ func (x *XHR) Init() error {
 // }
 
 func (x *XHR) StartReading() {
-	client := &http.Client{Timeout: time.Second * 30}
-
 	for {
 		select {
 		case <-x.Done:
@@ -86,19 +81,16 @@ func (x *XHR) StartReading() {
 		default:
 			req, err := http.NewRequest("POST", x.TransportAddress+"/xhr", nil)
 			if err != nil {
-				log.Print(err)
 				continue
 			}
 			resp, err := client.Do(req)
 			if err != nil {
-				log.Print(err)
 				continue
 			}
 
 			data, err := io.ReadAll(resp.Body)
 			_ = resp.Body.Close()
 			if err != nil {
-				log.Print(err)
 				continue
 			}
 
@@ -112,12 +104,6 @@ func (x *XHR) StartReading() {
 			case 'c':
 				// Session closed
 				x.setSessionState(sockjs.SessionClosed)
-				var v []interface{}
-				if err := json.Unmarshal(data[1:], &v); err != nil {
-					log.Printf("closing session: %s", err)
-					return
-				}
-				log.Printf("%v: %v", v[0], v[1])
 				return
 			}
 		}
@@ -153,7 +139,7 @@ func (x *XHR) Close() error {
 	select {
 	case x.Done <- true:
 	default:
-		return fmt.Errorf("error closing XHR")
+		return errors.New("error closing XHR")
 	}
 	return nil
 }
