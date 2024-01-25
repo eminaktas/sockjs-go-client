@@ -14,7 +14,7 @@ go get -u github.com/eminaktas/sockjs-go-client
 
 ## Usage
 
-Here's a quick example demonstrating how to create and use a sockJS connection with STOMP protocol:
+Here's a quick example demonstrating how to create and use a SockJS connection with STOMP protocol:
 
 ```go
 package main
@@ -30,7 +30,7 @@ import (
 
 func main() {
  // Define SockJS server address
- serverAddress := "http://localhost:3333/ws/connect"
+ serverAddress := "http://localhost:8080/sockjs"
 
  // Create a new SockJS client instance
  headers := make(http.Header)
