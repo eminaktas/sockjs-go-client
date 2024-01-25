@@ -80,3 +80,7 @@ func main() {
  log.Printf("Received Message from '%s': %s\n", destination, receivedMessage.Body)
 }
 ```
+
+## TODO
+
+- [ ] Test XHR support
