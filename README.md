@@ -14,7 +14,9 @@ go get -u github.com/eminaktas/sockjs-go-client
 
 ## Usage
 
-Here's a quick example demonstrating how to create and use a SockJS connection with STOMP protocol:
+Here's a quick example demonstrating how to create and use a SockJS connection with STOMP protocol.
+
+For the server, you can use the `sockjs-stomp-go-server` project. Refer to the [example provided here](https://github.com/eminaktas/sockjs-stomp-go-server/blob/main/example/main.go) for a server-side implementation.
 
 ```go
 package main
@@ -30,7 +32,7 @@ import (
 
 func main() {
  // Define SockJS server address
- serverAddress := "http://localhost:8080/sockjs"
+ serverAddress := "http://localhost:8085/connect"
 
  // Create a new SockJS client instance
  headers := make(http.Header)
@@ -66,21 +68,29 @@ func main() {
 
  log.Println("STOMP connection successful")
 
- // Subscribe to a destination on the STOMP server
- destination := "/destination"
- subscription, _ := stompConnection.Subscribe(destination, stomp.AckAuto)
-
  // Send a message to the specified destination
+ sendDestination := "/echo/"
  messageBody := "an example message"
- log.Printf("Sending message to '%s': %s\n", destination, messageBody)
- _ = stompConnection.Send(destination, "text/plain", []byte(messageBody))
+ log.Printf("Sending message to '%s': %s\n", sendDestination, messageBody)
+ _ = stompConnection.Send(sendDestination, "text/plain", []byte(messageBody))
+
+ // Subscribe to a destination on the STOMP server
+ subscribeDestination := "/topic"
+ subscription, err := stompConnection.Subscribe(subscribeDestination, stomp.AckAuto)
+ if err != nil {
+  log.Printf("Subscription failed: %v\n", err)
+  return
+ }
 
  // Wait for the response from the subscribed destination
  receivedMessage := <-subscription.C
- log.Printf("Received Message from '%s': %s\n", destination, receivedMessage.Body)
+ if receivedMessage.Err != nil {
+  log.Printf("message recieve failed: %v\n", receivedMessage.Err)
+  return
+ }
+ log.Printf("Received Message from '%s': %s\n", subscribeDestination, receivedMessage.Body)
+
+ // Unsubscribe after message receieved.
+ subscription.Unsubscribe()
 }
 ```
-
-## TODO
-
-- [ ] Test XHR support
