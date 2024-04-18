@@ -86,3 +86,7 @@ func (c *Client) Read(p []byte) (int, error) {
 func (c *Client) Close() error {
 	return c.Connection.Close()
 }
+
+func (c *Client) ForceClose() {
+	c.Connection.ForceClose()
+}

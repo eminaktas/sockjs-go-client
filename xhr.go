@@ -144,6 +144,10 @@ func (x *XHR) Close() error {
 	return nil
 }
 
+// No need for ForceClose.
+func (x *XHR) ForceClose() {
+}
+
 func (x *XHR) GetSessionState() sockjs.SessionState {
 	x.mu.RLock()
 	defer x.mu.RUnlock()

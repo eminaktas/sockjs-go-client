@@ -51,6 +51,12 @@ func (w *WebSocket) Loop() {
 
 	go func() {
 		err := backoff.Retry(func() error {
+			select {
+			case <-w.Reconnected:
+				return backoff.Permanent(errors.New("ForceClose channel closed"))
+			default:
+			}
+
 			ws, _, err := dialer.Dial(w.TransportAddress, w.RequestHeaders)
 			if err != nil {
 				return err
@@ -145,4 +151,8 @@ func (w *WebSocket) Write(v []byte) (int, error) {
 // Close closes the WebSocket connection.
 func (w *WebSocket) Close() error {
 	return w.Connection.Close()
+}
+
+func (w *WebSocket) ForceClose() {
+	close(w.Reconnected)
 }
